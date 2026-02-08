@@ -80,8 +80,11 @@ def stream_handler():
         
         # YOUTUBE SPECIFIC LOGIC
         else:
-            # Add Android spoofing ONLY for YouTube (causes issues on IG)
-            cmd.extend(["--extractor-args", "youtube:player_client=android"])
+            # Enhanced anti-bot measures for YouTube
+            cmd.extend([
+                "--extractor-args", "youtube:player_client=android,ios",
+                "--add-header", "Accept-Language:en-US,en;q=0.9",
+            ])
             
             if fmt == "mp3":
                 cmd.extend(["-f", "bestaudio/best"])
@@ -175,6 +178,14 @@ def download():
             "noplaylist": True,
             "ignoreerrors": True, # Don't crash on "No video" error
         }
+        
+        # Add YouTube-specific anti-bot measures
+        if not is_instagram:
+            ydl_opts["extractor_args"] = {
+                "youtube": {
+                    "player_client": ["android", "ios"],
+                }
+            }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
