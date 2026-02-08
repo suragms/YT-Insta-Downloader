@@ -4,7 +4,8 @@ services:
     name: yt-downloader-backend
     env: docker
     plan: free
-    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
         value: 5000
