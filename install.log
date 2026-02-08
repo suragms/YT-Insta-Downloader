@@ -1,0 +1,31 @@
+npm verbose cli C:\Program Files\nodejs\node.exe C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js
+npm info using npm@11.6.2
+npm info using node@v24.12.0
+npm verbose title npm install
+npm verbose argv "install" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 dir:C:\Users\Surag\AppData\Local\npm-cache\_logs\2026-02-08T06_03_46_471Z-
+npm verbose logfile C:\Users\Surag\AppData\Local\npm-cache\_logs\2026-02-08T06_03_46_471Z-debug-0.log
+npm verbose stack Error: Could not read package.json: Error: ENOENT: no such file or directory, open 'D:\surag_projects\custom-app3\package.json'
+npm verbose stack     at async open (node:internal/fs/promises:642:25)
+npm verbose stack     at async readFile (node:internal/fs/promises:1279:14)
+npm verbose stack     at async read (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\read-package.js:9:18)
+npm verbose stack     at async PackageJson.load (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\index.js:131:31)
+npm verbose stack     at async PackageJson.normalize (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\package-json\lib\index.js:117:5)
+npm verbose stack     at async runScript (C:\Program Files\nodejs\node_modules\npm\node_modules\@npmcli\run-script\lib\run-script.js:11:28)
+npm verbose stack     at async Install.exec (C:\Program Files\nodejs\node_modules\npm\lib\commands\install.js:163:9)
+npm verbose stack     at async Npm.exec (C:\Program Files\nodejs\node_modules\npm\lib\npm.js:208:9)
+npm verbose stack     at async module.exports (C:\Program Files\nodejs\node_modules\npm\lib\cli\entry.js:67:5)
+npm error code ENOENT
+npm error syscall open
+npm error path D:\surag_projects\custom-app3\package.json
+npm error errno -4058
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open 'D:\surag_projects\custom-app3\package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm verbose cwd D:\surag_projects\custom-app3
+npm verbose os Windows_NT 10.0.26200
+npm verbose node v24.12.0
+npm verbose npm  v11.6.2
+npm verbose exit -4058
+npm verbose code -4058
+npm error A complete log of this run can be found in: C:\Users\Surag\AppData\Local\npm-cache\_logs\2026-02-08T06_03_46_471Z-debug-0.log

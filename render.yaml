@@ -1,0 +1,11 @@
+services:
+  # Backend Service (Docker) - Free Tier
+  - type: web
+    name: yt-downloader-backend
+    env: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 5000
