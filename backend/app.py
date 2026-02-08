@@ -66,7 +66,9 @@ def stream_handler():
             "--no-playlist",
             # Anti-blocking measures (Keep generic cache clear)
             "--rm-cache-dir",
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "--no-check-certificate",
+            "--geo-bypass",
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ]
 
         # INSTAGRAM SPECIFIC LOGIC
@@ -82,7 +84,7 @@ def stream_handler():
         else:
             # Enhanced anti-bot measures for YouTube
             cmd.extend([
-                "--extractor-args", "youtube:player_client=android,ios",
+                "--extractor-args", "youtube:player_client=android,ios;skip=webpage,configs",
                 "--add-header", "Accept-Language:en-US,en;q=0.9",
             ])
             
@@ -184,8 +186,11 @@ def download():
             ydl_opts["extractor_args"] = {
                 "youtube": {
                     "player_client": ["android", "ios"],
+                    "skip": ["webpage", "configs"],
                 }
             }
+            ydl_opts["geo_bypass"] = True
+            ydl_opts["nocheckcertificate"] = True
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
