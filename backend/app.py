@@ -14,6 +14,13 @@ def home():
 
 import sys
 import subprocess
+import os
+
+# Check for cookies in environment variable and write to file
+if os.environ.get("YOUTUBE_COOKIES"):
+    with open("cookies.txt", "w") as f:
+        f.write(os.environ.get("YOUTUBE_COOKIES"))
+
 
 @app.route("/stream_handler")
 def stream_handler():
@@ -70,6 +77,10 @@ def stream_handler():
             "--geo-bypass",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ]
+
+        if os.path.exists("cookies.txt"):
+            cmd.extend(["--cookies", "cookies.txt"])
+
 
         # INSTAGRAM SPECIFIC LOGIC
         if is_instagram:
@@ -180,6 +191,10 @@ def download():
             "noplaylist": True,
             "ignoreerrors": True, # Don't crash on "No video" error
         }
+
+        if os.path.exists("cookies.txt"):
+            ydl_opts["cookiefile"] = "cookies.txt"
+
         
         # Add YouTube-specific anti-bot measures
         if not is_instagram:
