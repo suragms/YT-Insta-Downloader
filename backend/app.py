@@ -17,9 +17,14 @@ import subprocess
 import os
 
 # Check for cookies in environment variable and write to file
-if os.environ.get("YOUTUBE_COOKIES"):
-    with open("cookies.txt", "w") as f:
-        f.write(os.environ.get("YOUTUBE_COOKIES"))
+# Check for cookies in environment variable and write to file
+try:
+    if os.environ.get("YOUTUBE_COOKIES"):
+        with open("cookies.txt", "w", encoding="utf-8") as f:
+            f.write(os.environ.get("YOUTUBE_COOKIES"))
+        print("Successfully wrote cookies from env var.")
+except Exception as e:
+    print(f"Error writing cookies from env var: {e}")
 
 
 @app.route("/stream_handler")
