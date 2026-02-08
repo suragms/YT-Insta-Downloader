@@ -100,7 +100,7 @@ def stream_handler():
         else:
             # Enhanced anti-bot measures for YouTube
             cmd.extend([
-                "--extractor-args", "youtube:player_client=android,ios;skip=webpage,configs",
+                "--extractor-args", "youtube:skip=webpage,configs",
                 "--add-header", "Accept-Language:en-US,en;q=0.9",
             ])
             
@@ -205,7 +205,6 @@ def download():
         if not is_instagram:
             ydl_opts["extractor_args"] = {
                 "youtube": {
-                    "player_client": ["android", "ios"],
                     "skip": ["webpage", "configs"],
                 }
             }
