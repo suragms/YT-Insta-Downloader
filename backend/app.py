@@ -61,6 +61,31 @@ def debug():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/test_youtube")
+def test_youtube():
+    """Diagnostic route to attempt a simple extraction and return the raw error."""
+    try:
+        url = "https://www.youtube.com/watch?v=BaW_jenozKc" # Use a standard, short video
+        
+        ydl_opts = {
+            "quiet": True,
+            "noplaylist": True,
+            # No anti-bot measures to test generic functionality first
+        }
+        
+        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+             ydl_opts["cookiefile"] = COOKIE_FILE_PATH
+        elif os.path.exists("cookies.txt"):
+             ydl_opts["cookiefile"] = "cookies.txt"
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return f"Success! Title: {info.get('title')}"
+            
+    except Exception as e:
+        # Return full traceback + error message as plain text
+        return Response(f"Error:\n{traceback.format_exc()}\n\nDetails: {str(e)}", mimetype='text/plain'), 500
+
 def setup_cookies():
     """
     Writes cookies from the environment variable to a temporary file.
