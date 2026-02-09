@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
     nodejs \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container

@@ -63,28 +63,47 @@ def debug():
 
 @app.route("/test_youtube")
 def test_youtube():
-    """Diagnostic route to attempt a simple extraction and return the raw error."""
+    """Diagnostic route to attempt extraction with and without cookies."""
+    results = {}
+    url = "https://www.youtube.com/watch?v=BaW_jenozKc" # Standard test video
+
+    # Test 1: Without Cookies
     try:
-        url = "https://www.youtube.com/watch?v=BaW_jenozKc" # Use a standard, short video
-        
-        ydl_opts = {
+        ydl_opts_no_cookies = {
             "quiet": True,
             "noplaylist": True,
-            # No anti-bot measures to test generic functionality first
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
-        
-        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
-             ydl_opts["cookiefile"] = COOKIE_FILE_PATH
-        elif os.path.exists("cookies.txt"):
-             ydl_opts["cookiefile"] = "cookies.txt"
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts_no_cookies) as ydl:
             info = ydl.extract_info(url, download=False)
-            return f"Success! Title: {info.get('title')}"
+            results["no_cookies"] = f"Success! Title: {info.get('title')}"
+    except Exception as e:
+        results["no_cookies"] = f"Failed: {str(e)}"
+
+    # Test 2: With Cookies
+    try:
+        ydl_opts_cookies = {
+            "quiet": True,
+            "noplaylist": True,
+            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+             ydl_opts_cookies["cookiefile"] = COOKIE_FILE_PATH
+             with yt_dlp.YoutubeDL(ydl_opts_cookies) as ydl:
+                info = ydl.extract_info(url, download=False)
+                results["with_cookies"] = f"Success! Title: {info.get('title')}"
+        elif os.path.exists("cookies.txt"):
+             ydl_opts_cookies["cookiefile"] = "cookies.txt"
+             with yt_dlp.YoutubeDL(ydl_opts_cookies) as ydl:
+                info = ydl.extract_info(url, download=False)
+                results["with_cookies"] = f"Success! Title: {info.get('title')}"
+        else:
+            results["with_cookies"] = "Skipped (No cookies found)"
             
     except Exception as e:
-        # Return full traceback + error message as plain text
-        return Response(f"Error:\n{traceback.format_exc()}\n\nDetails: {str(e)}", mimetype='text/plain'), 500
+        results["with_cookies"] = f"Failed: {str(e)}"
+
+    return jsonify(results)
 
 def setup_cookies():
     """
