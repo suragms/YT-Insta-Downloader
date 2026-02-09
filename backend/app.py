@@ -48,19 +48,14 @@ def debug():
 
         # Check IP
         try:
-            server_ip_v4 = subprocess.check_output(["curl", "-s", "-4", "ifconfig.me"]).decode().strip()
-        except: server_ip_v4 = "Unknown"
-
-        try:
-            server_ip_v6 = subprocess.check_output(["curl", "-s", "-6", "ifconfig.me"]).decode().strip()
-        except: server_ip_v6 = "IPv6 Not Available"
+            server_ip = subprocess.check_output(["curl", "-s", "ifconfig.me"]).decode().strip()
+        except: server_ip = "Unknown"
 
         return jsonify({
             "cookies": cookie_status,
             "yt_dlp_version": yt_version,
             "node_version": node_version,
-            "server_ip_v4": server_ip_v4,
-            "server_ip_v6": server_ip_v6,
+            "server_ip": server_ip,
             "env_cookie_var_present": bool(os.environ.get("YOUTUBE_COOKIES"))
         })
     except Exception as e:
@@ -72,28 +67,30 @@ def test_youtube():
     results = {}
     url = "https://www.youtube.com/watch?v=BaW_jenozKc" # Standard test video
 
-    # Test 1: Without Cookies (Force IPv6)
+    # Test 1: Without Cookies (Verbose)
     try:
         ydl_opts_no_cookies = {
-            "quiet": True,
+            "quiet": False, # Enable verbose logs
+            "verbose": True,
             "noplaylist": True,
-            "source_address": "::", # Force IPv6
-            "force_ipv6": True,
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
         with yt_dlp.YoutubeDL(ydl_opts_no_cookies) as ydl:
+            # Capture stdout/stderr? Flask log captures it.
+            # But here we want to return it.
+            # We can't easily capture verbose logs without redirecting streams.
+            # Let's rely on extracting info.
             info = ydl.extract_info(url, download=False)
             results["no_cookies"] = f"Success! Title: {info.get('title')}"
     except Exception as e:
         results["no_cookies"] = f"Failed: {str(e)}"
 
-    # Test 2: With Cookies (Force IPv6)
+    # Test 2: With Cookies (Verbose)
     try:
         ydl_opts_cookies = {
-            "quiet": True,
+            "quiet": False, # Enable verbose logs
+            "verbose": True,
             "noplaylist": True,
-            "source_address": "::", # Force IPv6
-            "force_ipv6": True,
             "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
         if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
