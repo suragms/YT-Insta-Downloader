@@ -25,6 +25,42 @@ COOKIE_FILE_PATH = None
 def home():
     return "YouTube Downloader API running"
 
+@app.route("/debug")
+def debug():
+    try:
+        # Check Cookies
+        cookie_status = "Not Found"
+        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+            cookie_size = os.path.getsize(COOKIE_FILE_PATH)
+            cookie_status = f"Found (Size: {cookie_size} bytes)"
+        elif os.path.exists("cookies.txt"):
+            cookie_size = os.path.getsize("cookies.txt")
+            cookie_status = f"Found local cookies.txt (Size: {cookie_size} bytes)"
+
+        # Check Versions
+        try:
+            yt_version = subprocess.check_output([sys.executable, "-m", "yt_dlp", "--version"]).decode().strip()
+        except: yt_version = "Error"
+        
+        try:
+            node_version = subprocess.check_output(["node", "--version"]).decode().strip()
+        except: node_version = "Not Found"
+
+        # Check IP
+        try:
+            server_ip = subprocess.check_output(["curl", "-s", "ifconfig.me"]).decode().strip()
+        except: server_ip = "Unknown"
+
+        return jsonify({
+            "cookies": cookie_status,
+            "yt_dlp_version": yt_version,
+            "node_version": node_version,
+            "server_ip": server_ip,
+            "env_cookie_var_present": bool(os.environ.get("YOUTUBE_COOKIES"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 def setup_cookies():
     """
     Writes cookies from the environment variable to a temporary file.
