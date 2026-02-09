@@ -3,29 +3,55 @@ from flask_cors import CORS
 import yt_dlp
 import requests
 import urllib.parse
+import sys
+import subprocess
+import os
+import tempfile
+import logging
+import traceback
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 # Enable CORS for all routes
 CORS(app)
 
+# Global variable to store the path to the cookie file
+COOKIE_FILE_PATH = None
+
 @app.route("/")
 def home():
     return "YouTube Downloader API running"
 
-import sys
-import subprocess
-import os
+def setup_cookies():
+    """
+    Writes cookies from the environment variable to a temporary file.
+    Returns the path to the temporary file or None if no cookies are present.
+    """
+    global COOKIE_FILE_PATH
+    cookie_content = os.environ.get("YOUTUBE_COOKIES")
+    
+    if cookie_content:
+        try:
+            # Create a temporary file that persists until explicitly deleted (or OS cleans up)
+            # We use delete=False so we can close it and pass the path to yt-dlp
+            tf = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt', encoding='utf-8')
+            tf.write(cookie_content)
+            tf.close()
+            COOKIE_FILE_PATH = tf.name
+            logger.info(f"Successfully wrote cookies to temporary file: {COOKIE_FILE_PATH}")
+            return COOKIE_FILE_PATH
+        except Exception as e:
+            logger.error(f"Error writing cookies to temp file: {e}")
+            return None
+    else:
+        logger.info("No YOUTUBE_COOKIES environment variable found.")
+        return None
 
-# Check for cookies in environment variable and write to file
-# Check for cookies in environment variable and write to file
-try:
-    if os.environ.get("YOUTUBE_COOKIES"):
-        with open("cookies.txt", "w", encoding="utf-8") as f:
-            f.write(os.environ.get("YOUTUBE_COOKIES"))
-        print("Successfully wrote cookies from env var.")
-except Exception as e:
-    print(f"Error writing cookies from env var: {e}")
-
+# Initialize cookies on startup
+setup_cookies()
 
 @app.route("/stream_handler")
 def stream_handler():
@@ -83,8 +109,10 @@ def stream_handler():
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ]
 
-        if os.path.exists("cookies.txt"):
-            cmd.extend(["--cookies", "cookies.txt"])
+        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+            cmd.extend(["--cookies", COOKIE_FILE_PATH])
+        elif os.path.exists("cookies.txt"): # Fallback to local file if exists
+             cmd.extend(["--cookies", "cookies.txt"])
 
 
         # INSTAGRAM SPECIFIC LOGIC
@@ -113,6 +141,7 @@ def stream_handler():
         cmd.append(url)
 
         # Start subprocess
+        logger.info(f"Stream command: {cmd}")
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -125,7 +154,8 @@ def stream_handler():
                 # Check for immediate errors
                 if proc.poll() is not None and proc.returncode != 0:
                      err = proc.stderr.read()
-                     print(f"yt-dlp process failed early: {err.decode('utf-8', errors='ignore')}")
+                     error_msg = err.decode('utf-8', errors='ignore')
+                     logger.error(f"yt-dlp stream process failed early: {error_msg}")
                      return
 
                 while True:
@@ -134,11 +164,13 @@ def stream_handler():
                         if proc.poll() is not None:
                             if proc.returncode != 0:
                                 err = proc.stderr.read()
-                                print(f"yt-dlp Error: {err.decode('utf-8', errors='ignore')}")
+                                error_msg = err.decode('utf-8', errors='ignore')
+                                logger.error(f"yt-dlp Stream Error: {error_msg}")
                             break
                     yield chunk
             except Exception as e:
-                print(f"Stream generation error: {e}")
+                logger.error(f"Stream generation exception: {e}")
+                logger.error(traceback.format_exc())
             finally:
                 proc.stdout.close()
                 proc.stderr.close()
@@ -154,6 +186,8 @@ def stream_handler():
         )
             
     except Exception as e:
+        logger.error(f"Stream Handle Exception: {e}")
+        logger.error(traceback.format_exc())
         return f"Stream Error: {str(e)}", 500
 
 @app.route("/thumbnail_proxy")
@@ -172,6 +206,7 @@ def thumbnail_proxy():
             content_type=req.headers.get("Content-Type", "image/jpeg")
         )
     except Exception as e:
+        logger.error(f"Thumbnail Proxy Error: {e}")
         return f"Thumbnail Error: {str(e)}", 500
 
 @app.route("/download", methods=["POST"])
@@ -182,6 +217,8 @@ def download():
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+
+    logger.info(f"Received download request for URL: {url}")
 
     try:
         # Detect platform
@@ -197,8 +234,14 @@ def download():
             "ignoreerrors": True, # Don't crash on "No video" error
         }
 
-        if os.path.exists("cookies.txt"):
+        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+            ydl_opts["cookiefile"] = COOKIE_FILE_PATH
+            logger.info("Using cookies from temp file.")
+        elif os.path.exists("cookies.txt"):
             ydl_opts["cookiefile"] = "cookies.txt"
+            logger.info("Using cookies from local file.")
+        else:
+            logger.warning("No cookies found for yt-dlp.")
 
         
         # Add YouTube-specific anti-bot measures
@@ -212,11 +255,17 @@ def download():
             ydl_opts["nocheckcertificate"] = True
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            try:
+                info = ydl.extract_info(url, download=False)
+            except Exception as e:
+                logger.error(f"yt-dlp extraction failed: {e}")
+                logger.error(traceback.format_exc())
+                # Re-raise to catch in outer block or handle specific errors here
+                raise e
             
             # Fallback/Primary for Instagram Photos using Instaloader
             if is_instagram and (not info or not info.get("url")):
-                 print("yt-dlp failed, switching to Instaloader...")
+                 logger.info("yt-dlp failed, switching to Instaloader...")
                  try:
                      import instaloader
                      
@@ -237,7 +286,7 @@ def download():
                      match = re.search(r'/(p|reel)/([^/?#&]+)', url)
                      if match:
                          shortcode = match.group(2)
-                         print(f"Instaloader processing shortcode: {shortcode}")
+                         logger.info(f"Instaloader processing shortcode: {shortcode}")
                          
                          post = instaloader.Post.from_shortcode(L.context, shortcode)
                          
@@ -248,7 +297,7 @@ def download():
                          if post.caption:
                              title = post.caption[:30] + "..."
                              
-                         print(f"Instaloader Success! Found URL: {final_image_url}")
+                         logger.info(f"Instaloader Success! Found URL: {final_image_url}")
 
                          # Construct response manually
                          safe_title = urllib.parse.quote(title)
@@ -269,7 +318,7 @@ def download():
                          return jsonify({"error": "Could not parse Instagram shortcode."}), 400
 
                  except Exception as exc:
-                     print(f"Instaloader exception: {exc}")
+                     logger.error(f"Instaloader exception: {exc}")
                      return jsonify({"error": f"Instaloader failed: {str(exc)}"}), 500
 
             if not info:
@@ -292,8 +341,9 @@ def download():
             })
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"General Download Error: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({"error": f"Server Error: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

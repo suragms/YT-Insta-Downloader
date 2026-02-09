@@ -1,20 +1,27 @@
-# Dependencies
-node_modules/
-venv/
-__pycache__/
-
-# Environment variables
+# General
+.DS_Store
 .env
-.env.local
+.env.*
+!.env.example
 
-# Build outputs
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+*.log
+
+# Cookies (Sensitive!)
+cookies.txt
+backend/cookies.txt
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build
 dist/
 build/
-
-# IDE files
-.vscode/
-.idea/
-
-# OS files
-.DS_Store
-Thumbs.db
