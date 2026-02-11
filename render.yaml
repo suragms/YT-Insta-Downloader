@@ -8,4 +8,6 @@ services:
     dockerfilePath: ./Dockerfile
     envVars:
       - key: PORT
-        value: 5000
+        sync: false
+      - key: YOUTUBE_COOKIES
+        sync: false
