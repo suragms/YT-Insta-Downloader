@@ -5,20 +5,37 @@ export default function App() {
     const [format, setFormat] = useState("mp4");
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState("");
 
     const handleDownload = async () => {
         if (!url) return alert("Paste URL");
 
         setLoading(true);
         setResult(null);
+        setLoadingMessage("Connecting to server...");
 
         try {
             const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+            // Update message after 3 seconds if still loading
+            const messageTimeout = setTimeout(() => {
+                setLoadingMessage("Server is waking up (this may take 30-60s on free tier)...");
+            }, 3000);
+
             const res = await fetch(`${apiUrl}/download`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, format })
+                body: JSON.stringify({ url, format }),
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+            clearTimeout(messageTimeout);
+            setLoadingMessage("Processing your request...");
 
             const data = await res.json();
 
@@ -28,10 +45,17 @@ export default function App() {
 
             setResult(data);
         } catch (err) {
-            alert(err.message);
+            if (err.name === 'AbortError') {
+                alert("Request timed out. The server might be waking up (Render free tier). Please try again in a moment.");
+            } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                alert("Cannot connect to server. The backend might be sleeping (Render free tier takes 30-60s to wake up). Please wait a moment and try again.");
+            } else {
+                alert(err.message);
+            }
         }
 
         setLoading(false);
+        setLoadingMessage("");
     };
 
     return (
@@ -64,7 +88,7 @@ export default function App() {
                     disabled={loading}
                     className="w-full mt-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white font-bold rounded-lg transition-all flex justify-center items-center gap-2"
                 >
-                    {loading ? "Processing..." : "Download Now"}
+                    {loading ? loadingMessage || "Processing..." : "Download Now"}
                 </button>
             </div>
 
