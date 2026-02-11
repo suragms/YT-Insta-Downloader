@@ -9,5 +9,5 @@ services:
     envVars:
       - key: PORT
         sync: false
-      - key: YOUTUBE_COOKIES
+      - key: YOUTUBE_COOKIES_BASE64
         sync: false

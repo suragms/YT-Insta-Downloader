@@ -114,26 +114,58 @@ def test_youtube():
 def setup_cookies():
     """
     Writes cookies from the environment variable to a temporary file.
+    Supports both base64-encoded and plain text cookies.
     Returns the path to the temporary file or None if no cookies are present.
     """
     global COOKIE_FILE_PATH
+    import base64
+    
+    # Try base64-encoded cookies first (recommended for Render)
+    cookie_content_base64 = os.environ.get("YOUTUBE_COOKIES_BASE64")
     cookie_content = os.environ.get("YOUTUBE_COOKIES")
     
-    if cookie_content:
+    final_content = None
+    
+    if cookie_content_base64:
+        try:
+            # Decode from base64
+            decoded_bytes = base64.b64decode(cookie_content_base64)
+            final_content = decoded_bytes.decode('utf-8')
+            logger.info("Using base64-encoded cookies from YOUTUBE_COOKIES_BASE64")
+        except Exception as e:
+            logger.error(f"Error decoding base64 cookies: {e}")
+            final_content = None
+    
+    # Fallback to plain text cookies
+    if not final_content and cookie_content:
+        final_content = cookie_content
+        logger.info("Using plain text cookies from YOUTUBE_COOKIES")
+    
+    if final_content:
         try:
             # Create a temporary file that persists until explicitly deleted (or OS cleans up)
             # We use delete=False so we can close it and pass the path to yt-dlp
             tf = tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt', encoding='utf-8')
-            tf.write(cookie_content)
+            tf.write(final_content)
             tf.close()
             COOKIE_FILE_PATH = tf.name
             logger.info(f"Successfully wrote cookies to temporary file: {COOKIE_FILE_PATH}")
+            
+            # Validate the cookie file
+            try:
+                with open(COOKIE_FILE_PATH, 'r') as f:
+                    lines = f.readlines()
+                    valid_lines = [l for l in lines if l.strip() and not l.startswith('#')]
+                    logger.info(f"Cookie file has {len(valid_lines)} valid cookie entries")
+            except Exception as e:
+                logger.warning(f"Could not validate cookie file: {e}")
+            
             return COOKIE_FILE_PATH
         except Exception as e:
             logger.error(f"Error writing cookies to temp file: {e}")
             return None
     else:
-        logger.info("No YOUTUBE_COOKIES environment variable found.")
+        logger.info("No YOUTUBE_COOKIES or YOUTUBE_COOKIES_BASE64 environment variable found.")
         return None
 
 # Initialize cookies on startup
