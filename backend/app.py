@@ -18,8 +18,9 @@ app = Flask(__name__)
 # CORS: allow frontend on Firebase (different origin) to call this API on Render
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
-# Global variable to store the path to the cookie file
+# Global: path to cookie file, and flag to skip cookies if they caused errors (e.g. invalid on Render)
 COOKIE_FILE_PATH = None
+COOKIES_DISABLED = False
 
 @app.route("/")
 def home():
@@ -227,10 +228,11 @@ def stream_handler():
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         ]
 
-        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
-            cmd.extend(["--cookies", COOKIE_FILE_PATH])
-        elif os.path.exists("cookies.txt"): # Fallback to local file if exists
-             cmd.extend(["--cookies", "cookies.txt"])
+        if not COOKIES_DISABLED:
+            if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+                cmd.extend(["--cookies", COOKIE_FILE_PATH])
+            elif os.path.exists("cookies.txt"):
+                cmd.extend(["--cookies", "cookies.txt"])
 
 
         # INSTAGRAM SPECIFIC LOGIC
@@ -346,117 +348,102 @@ def download():
         # because the stream_handler will handle the download.
         # But we still extract info to show the title/thumbnail to the user.
         
-        ydl_opts = {
-            "quiet": True,
-            "noplaylist": True,
-            "ignoreerrors": True, # Don't crash on "No video" error
-        }
-
-        if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
-            ydl_opts["cookiefile"] = COOKIE_FILE_PATH
-            logger.info("Using cookies from temp file.")
-        elif os.path.exists("cookies.txt"):
-            ydl_opts["cookiefile"] = "cookies.txt"
-            logger.info("Using cookies from local file.")
-        else:
-            logger.warning("No cookies found for yt-dlp.")
-
-        
-        # Add YouTube-specific anti-bot measures
-        if not is_instagram:
-            ydl_opts["extractor_args"] = {
-                "youtube": {
-                    "skip": ["webpage", "configs"],
-                }
+        def make_ydl_opts(use_cookies=True):
+            opts = {
+                "quiet": True,
+                "noplaylist": True,
+                "ignoreerrors": True,
             }
-            ydl_opts["geo_bypass"] = True
-            ydl_opts["nocheckcertificate"] = True
+            if use_cookies:
+                if COOKIE_FILE_PATH and os.path.exists(COOKIE_FILE_PATH):
+                    opts["cookiefile"] = COOKIE_FILE_PATH
+                elif os.path.exists("cookies.txt"):
+                    opts["cookiefile"] = "cookies.txt"
+            if not is_instagram:
+                opts["extractor_args"] = {"youtube": {"skip": ["webpage", "configs"]}}
+            opts["geo_bypass"] = True
+            opts["nocheckcertificate"] = True
+            return opts
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            try:
+        info = None
+        try:
+            with yt_dlp.YoutubeDL(make_ydl_opts(use_cookies=True)) as ydl:
                 info = ydl.extract_info(url, download=False)
-            except Exception as e:
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "cookie" in err_msg and (COOKIE_FILE_PATH or os.path.exists("cookies.txt")):
+                global COOKIES_DISABLED
+                COOKIES_DISABLED = True
+                logger.warning(f"Cookie error (retrying without cookies): {e}")
+                try:
+                    with yt_dlp.YoutubeDL(make_ydl_opts(use_cookies=False)) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                except Exception as e2:
+                    logger.error(f"yt-dlp extraction failed: {e2}")
+                    logger.error(traceback.format_exc())
+                    raise e2
+            else:
                 logger.error(f"yt-dlp extraction failed: {e}")
                 logger.error(traceback.format_exc())
-                # Re-raise to catch in outer block or handle specific errors here
                 raise e
-            
-            # Fallback/Primary for Instagram Photos using Instaloader
-            if is_instagram and (not info or not info.get("url")):
-                 logger.info("yt-dlp failed, switching to Instaloader...")
-                 try:
-                     import instaloader
-                     
-                     # Create instance
-                     L = instaloader.Instaloader(
-                         download_pictures=False,
-                         download_videos=False, 
-                         download_video_thumbnails=False,
-                         download_geotags=False,
-                         download_comments=False,
-                         save_metadata=False,
-                         compress_json=False
-                     )
-                     
-                     # Extract shortcode from URL
-                     # https://www.instagram.com/p/SHORTCODE/
-                     import re
-                     match = re.search(r'/(p|reel)/([^/?#&]+)', url)
-                     if match:
-                         shortcode = match.group(2)
-                         logger.info(f"Instaloader processing shortcode: {shortcode}")
-                         
-                         post = instaloader.Post.from_shortcode(L.context, shortcode)
-                         
-                         final_image_url = post.url
-                         title = "Instagram Photo"
-                         
-                         # Try to get caption as title
-                         if post.caption:
-                             title = post.caption[:30] + "..."
-                             
-                         logger.info(f"Instaloader Success! Found URL: {final_image_url}")
 
-                         # Construct response manually
-                         safe_title = urllib.parse.quote(title)
-                         safe_url = urllib.parse.quote(final_image_url)
-                         safe_thumb = urllib.parse.quote(final_image_url)
-                         
-                         local_download_url = f"{request.host_url}stream_handler?url={safe_url}&title={safe_title}&format=jpg"
-                         local_thumbnail_url = f"{request.host_url}thumbnail_proxy?url={safe_thumb}"
-                         
-                         return jsonify({
-                            "title": title,
-                            "thumbnail": local_thumbnail_url,
-                            "download_url": local_download_url,
-                            "duration": 0,
-                            "author": post.owner_username
-                         })
-                     else:
-                         return jsonify({"error": "Could not parse Instagram shortcode."}), 400
+        # Fallback/Primary for Instagram Photos using Instaloader
+        if is_instagram and (not info or not info.get("url")):
+            logger.info("yt-dlp failed, switching to Instaloader...")
+            try:
+                import instaloader
+                import re
+                L = instaloader.Instaloader(
+                    download_pictures=False,
+                    download_videos=False,
+                    download_video_thumbnails=False,
+                    download_geotags=False,
+                    download_comments=False,
+                    save_metadata=False,
+                    compress_json=False
+                )
+                match = re.search(r'/(p|reel)/([^/?#&]+)', url)
+                if match:
+                    shortcode = match.group(2)
+                    logger.info(f"Instaloader processing shortcode: {shortcode}")
+                    post = instaloader.Post.from_shortcode(L.context, shortcode)
+                    final_image_url = post.url
+                    title = "Instagram Photo"
+                    if post.caption:
+                        title = post.caption[:30] + "..."
+                    logger.info(f"Instaloader Success! Found URL: {final_image_url}")
+                    safe_title = urllib.parse.quote(title)
+                    safe_url = urllib.parse.quote(final_image_url)
+                    safe_thumb = urllib.parse.quote(final_image_url)
+                    local_download_url = f"{request.host_url}stream_handler?url={safe_url}&title={safe_title}&format=jpg"
+                    local_thumbnail_url = f"{request.host_url}thumbnail_proxy?url={safe_thumb}"
+                    return jsonify({
+                        "title": title,
+                        "thumbnail": local_thumbnail_url,
+                        "download_url": local_download_url,
+                        "duration": 0,
+                        "author": post.owner_username
+                    })
+                return jsonify({"error": "Could not parse Instagram shortcode."}), 400
+            except Exception as exc:
+                logger.error(f"Instaloader exception: {exc}")
+                return jsonify({"error": f"Instaloader failed: {str(exc)}"}), 500
 
-                 except Exception as exc:
-                     logger.error(f"Instaloader exception: {exc}")
-                     return jsonify({"error": f"Instaloader failed: {str(exc)}"}), 500
+        if not info:
+            return jsonify({"error": "Failed to fetch info"}), 500
 
-            if not info:
-                 return jsonify({"error": "Failed to fetch info"}), 500
-
-            # Create a link to our OWN stream handler
-            safe_title = urllib.parse.quote(info.get("title", "video"))
-            safe_url = urllib.parse.quote(url) # Pass the Original YouTube URL
-            safe_thumb = urllib.parse.quote(info.get("thumbnail", ""))
-            
-            local_download_url = f"{request.host_url}stream_handler?url={safe_url}&title={safe_title}&format={format_type}"
-            local_thumbnail_url = f"{request.host_url}thumbnail_proxy?url={safe_thumb}"
-
-            return jsonify({
-                "title": info.get("title"),
-                "thumbnail": local_thumbnail_url, # Use PROXY thumbnail
-                "download_url": local_download_url,
-                "duration": info.get("duration"),
-                "author": info.get("uploader")
-            })
+        safe_title = urllib.parse.quote(info.get("title", "video"))
+        safe_url = urllib.parse.quote(url)
+        safe_thumb = urllib.parse.quote(info.get("thumbnail", ""))
+        local_download_url = f"{request.host_url}stream_handler?url={safe_url}&title={safe_title}&format={format_type}"
+        local_thumbnail_url = f"{request.host_url}thumbnail_proxy?url={safe_thumb}"
+        return jsonify({
+            "title": info.get("title"),
+            "thumbnail": local_thumbnail_url,
+            "download_url": local_download_url,
+            "duration": info.get("duration"),
+            "author": info.get("uploader")
+        })
 
     except Exception as e:
         logger.error(f"General Download Error: {str(e)}")
