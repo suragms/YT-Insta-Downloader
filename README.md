@@ -34,6 +34,38 @@ A full-stack application for downloading videos from YouTube and Instagram.
 - Install dependencies: `pip install -r requirements.txt`
 - Run the server: `python app.py`
 
+## Deployment (Render + Firebase)
+
+### Backend on Render
+
+1. Connect your repo; Render will use `render.yaml` and build from `backend/` with the Dockerfile.
+2. **PORT** is set automatically by Render; the app binds to it (no extra config).
+3. Optional: add **YOUTUBE_COOKIES_BASE64** in Render Dashboard → Environment if you need cookies for restricted videos.
+4. After deploy, copy your backend URL (e.g. `https://yt-downloader-backend-xxxx.onrender.com`).
+
+### Frontend on Firebase
+
+1. Set the backend URL in **`frontend/.env.production`**:
+   ```bash
+   VITE_API_URL=https://YOUR-RENDER-SERVICE-URL.onrender.com
+   ```
+2. Build and deploy:
+   ```bash
+   cd frontend
+   npm run build
+   firebase deploy
+   ```
+3. The built app uses `VITE_API_URL` from `.env.production`; do not use `.env.local` for production builds.
+
+### Common post-host issues
+
+| Issue | Fix |
+|-------|-----|
+| "Cannot connect to server" | Render free tier sleeps after ~15 min; first request can take 30–60s to wake. Show a “Waking up…” message and retry. |
+| CORS errors | Backend allows all origins; if you restrict later, add your Firebase URL (e.g. `https://your-app.web.app`) to CORS. |
+| Download/thumbnail links broken | Backend uses `request.host_url` so links point to your Render URL; ensure the backend is deployed and reachable. |
+| Wrong API URL in production | Run `npm run build` from `frontend/` so Vite uses `.env.production`; avoid building with `.env.local` (localhost). |
+
 ## Author
 
 surag

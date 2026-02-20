@@ -15,8 +15,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-# Enable CORS for all routes
-CORS(app)
+# CORS: allow frontend on Firebase (different origin) to call this API on Render
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 # Global variable to store the path to the cookie file
 COOKIE_FILE_PATH = None

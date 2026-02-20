@@ -22,9 +22,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . .
 
-# Expose the port the app runs on
+# Render sets PORT; default 5000 for local
+ENV PORT=5000
 EXPOSE 5000
 
-# Run gunicorn
+# Run gunicorn (must bind to $PORT on Render)
 # Workers: 1 (for streaming stability), Threads: 8 (for concurrency)
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "--timeout", "0", "app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --timeout 0 app:app"]
