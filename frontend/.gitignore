@@ -7,8 +7,9 @@ yarn-error.log*
 firebase-debug.log*
 firebase-debug.*.log*
 
-# Firebase cache
+# Firebase cache and local config
 .firebase/
+configstore/
 
 # Firebase config
 

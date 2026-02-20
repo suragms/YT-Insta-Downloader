@@ -66,6 +66,29 @@ A full-stack application for downloading videos from YouTube and Instagram.
 | Download/thumbnail links broken | Backend uses `request.host_url` so links point to your Render URL; ensure the backend is deployed and reachable. |
 | Wrong API URL in production | Run `npm run build` from `frontend/` so Vite uses `.env.production`; avoid building with `.env.local` (localhost). |
 
+### Firebase deploy: "Failed to make request" or timeout
+
+If `firebase deploy` fails with **Failed to make request to firebasehosting.googleapis.com** or **An unexpected error**:
+
+1. **Re-authenticate** (fixes expired or invalid login):
+   ```bash
+   firebase login --reauth
+   ```
+   Complete the browser sign-in, then run `firebase deploy` again.
+
+2. **Enable Firebase Hosting API** (if you get 403 or "resource not accessible"):
+   - Open [Google Cloud Console](https://console.cloud.google.com/) → select project **yt-insta-downloader**.
+   - APIs & Services → **Enable APIs and Services** → search **Firebase Hosting API** → Enable.
+
+3. **Network / firewall**: Ensure your network allows HTTPS to `firebasehosting.googleapis.com` and `googleapis.com`. Disable VPN or try another network if needed.
+
+4. **Deploy only hosting** (sometimes more reliable):
+   ```bash
+   cd frontend
+   npm run build
+   firebase deploy --only hosting
+   ```
+
 ## Author
 
 surag

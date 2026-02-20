@@ -6,20 +6,21 @@ export default function App() {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState("");
+    const [connectionError, setConnectionError] = useState(null);
 
     const handleDownload = async () => {
         if (!url) return alert("Paste URL");
 
         setLoading(true);
         setResult(null);
+        setConnectionError(null);
         setLoadingMessage("Connecting to server...");
 
         try {
             const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-            // Create abort controller for timeout
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s for Render free tier wake-up
 
             // Update message after 3 seconds if still loading
             const messageTimeout = setTimeout(() => {
@@ -46,11 +47,11 @@ export default function App() {
             setResult(data);
         } catch (err) {
             if (err.name === 'AbortError') {
-                alert("Request timed out. The server might be waking up (Render free tier). Please try again in a moment.");
+                setConnectionError("Request timed out. The server may be waking up (Render free tier). Wait ~1 minute, then click Download again.");
             } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-                alert("Cannot connect to server. The backend might be sleeping (Render free tier takes 30-60s to wake up). Please wait a moment and try again.");
+                setConnectionError("Cannot connect — backend may be sleeping (Render free tier takes 30–60s to wake). Wait ~1 minute, then click Download again.");
             } else {
-                alert(err.message);
+                setConnectionError(err.message);
             }
         }
 
@@ -90,6 +91,12 @@ export default function App() {
                 >
                     {loading ? loadingMessage || "Processing..." : "Download Now"}
                 </button>
+
+                {connectionError && (
+                    <p className="mt-4 p-3 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-200 text-sm">
+                        {connectionError}
+                    </p>
+                )}
             </div>
 
             {result && (
