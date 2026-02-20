@@ -137,10 +137,22 @@ def setup_cookies():
             logger.error(f"Error decoding base64 cookies: {e}")
             final_content = None
     
-    # Fallback to plain text cookies
+    # Fallback to plain text cookies (or base64 mistakenly pasted into YOUTUBE_COOKIES)
     if not final_content and cookie_content:
-        final_content = cookie_content
-        logger.info("Using plain text cookies from YOUTUBE_COOKIES")
+        stripped = cookie_content.strip()
+        # If it looks like base64 (single line, no tabs), try decoding so Render env works either way
+        if "\t" not in stripped and "\n" not in stripped.replace("\r", ""):
+            try:
+                decoded_bytes = base64.b64decode(stripped)
+                decoded = decoded_bytes.decode("utf-8")
+                if "# Netscape" in decoded or "\t" in decoded:
+                    final_content = decoded
+                    logger.info("Using cookies from YOUTUBE_COOKIES (decoded from base64)")
+            except Exception:
+                pass
+        if not final_content:
+            final_content = cookie_content
+            logger.info("Using plain text cookies from YOUTUBE_COOKIES")
     
     if final_content:
         try:
